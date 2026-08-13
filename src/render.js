@@ -43,9 +43,9 @@ export function resizeCanvas(canvas) {
 export function createPileSquares(count, width, height, minSize, maxSize) {
   const squares = [];
   const cx = width * 0.5;
-  const floor = height * 0.9;
-  const heapW = width * 0.86;
-  const heapH = height * 0.7;
+  const floor = height * 0.92;
+  const heapW = width * 0.9;
+  const heapH = height * 0.82;
 
   for (let i = 0; i < count; i += 1) {
     const layer = Math.pow(Math.random(), 0.42);

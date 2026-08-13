@@ -239,14 +239,15 @@ function boot() {
     rafId = requestAnimationFrame(tick);
   }
 
-  function tick(ts) {
+  function tick() {
     rafId = 0;
     if (!anim) return;
-    if (!lastTs) lastTs = ts;
-    const dt = Math.min(0.033, (ts - lastTs) / 1000);
-    lastTs = ts;
+    const now = performance.now();
+    if (!lastTs) lastTs = now;
+    const dt = Math.min(0.033, (now - lastTs) / 1000);
+    lastTs = now;
 
-    const keepGoing = anim.step(ts, dt);
+    const keepGoing = anim.step(now, dt);
     draw();
 
     if (keepGoing) {
