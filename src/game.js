@@ -26,25 +26,33 @@ export const CONFIG = {
   MIN_SQUARE: 11,
   MAX_SQUARE: 24,
 
-  GRAVITY: 1680,
-  FRICTION: 0.988,
-  WALL_BOUNCE: 0.62,
-  FLOOR_BOUNCE: 0.48,
-  ROTATION_DAMP: 0.99,
+  // Speeds are authored for a ~720px-tall pile, then scaled to the canvas
+  // so hops fill the stage on both phones and high-DPR displays.
+  PHYSICS_REF_HEIGHT: 720,
+  GRAVITY: 340,
+  FRICTION: 0.996,
+  WALL_BOUNCE: 0.82,
+  FLOOR_BOUNCE: 0.78,
+  ROTATION_DAMP: 0.997,
 
-  IMPULSE_MIN: 520,
-  IMPULSE_MAX: 1180,
-  LIFT: 980,
-  SPIN_MAX: 22,
+  IMPULSE_MIN: 420,
+  IMPULSE_MAX: 780,
+  LIFT: 640,
+  SPIN_MAX: 18,
 
   INTRO_MS: 720,
-  TUMBLE_MS: 2100,
-  CULL_START_MS: 780,
-  CULL_KICK: 420,
-  SETTLE_MS: 1100,
+  // Visible tumble/scatter the player watches (2.5–3.5s including settle).
+  ANIMATION_DURATION: 3450,
+  TUMBLE_MS: 2800,
+  MIN_TUMBLE_FRAMES: 96,
+  CULL_START_MS: 1500,
+  CULL_KICK: 260,
+  SETTLE_MS: 650,
+  RETUMBLE_EVERY_MS: 520,
+  RETUMBLE_INTENSITY: 0.62,
 
-  SCREEN_SHAKE_MS: 420,
-  SCREEN_SHAKE_MAG: 18,
+  SCREEN_SHAKE_MS: 1100,
+  SCREEN_SHAKE_MAG: 26,
 
   TRY_AGAIN_RATE: 0.38,
   FINAL_PRIZE_WEIGHTS: {
@@ -110,29 +118,56 @@ function pickSurvivors(squares, count) {
   return chosen;
 }
 
-function applyImpulse(squares, intensity = 1) {
-  const throwAngle = -Math.PI / 2 + (Math.random() - 0.5) * 0.7;
-  const throwMag = (CONFIG.IMPULSE_MIN + Math.random() * (CONFIG.IMPULSE_MAX - CONFIG.IMPULSE_MIN)) * intensity;
-  const throwX = Math.cos(throwAngle) * throwMag * 0.32;
+function worldScale(width, height) {
+  return Math.max(height, width * 0.75) / CONFIG.PHYSICS_REF_HEIGHT;
+}
+
+function randomMag(intensity, scale) {
+  return (CONFIG.IMPULSE_MIN + Math.random() * (CONFIG.IMPULSE_MAX - CONFIG.IMPULSE_MIN)) * intensity * scale;
+}
+
+function applyImpulse(squares, intensity, width, height) {
+  const scale = worldScale(width, height);
+  const throwAngle = -Math.PI / 2 + (Math.random() - 0.5) * 1.1;
+  const throwMag = randomMag(intensity, scale);
+  const throwX = Math.cos(throwAngle) * throwMag * 0.55;
   const throwY = Math.sin(throwAngle) * throwMag;
 
   for (let i = 0; i < squares.length; i += 1) {
     const square = squares[i];
-    const angle = Math.random() * Math.PI * 2;
-    const mag = (CONFIG.IMPULSE_MIN + Math.random() * (CONFIG.IMPULSE_MAX - CONFIG.IMPULSE_MIN)) * intensity;
-    square.vx = Math.cos(angle) * mag * 0.55 + throwX;
-    square.vy = Math.sin(angle) * mag * 0.32 + throwY - CONFIG.LIFT * (0.75 + Math.random() * 0.55) * intensity;
+    const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.35;
+    const mag = randomMag(intensity, scale);
+    square.vx = Math.cos(angle) * mag * 0.95 + throwX;
+    square.vy = Math.sin(angle) * mag * 0.55 + throwY - CONFIG.LIFT * scale * (0.9 + Math.random() * 0.8) * intensity;
     square.vr = (Math.random() - 0.5) * CONFIG.SPIN_MAX * intensity;
     square.opacity = 1;
   }
 }
 
+function applyTumblePulse(squares, intensity, width, height) {
+  const scale = worldScale(width, height);
+  const lift = CONFIG.LIFT * scale * intensity;
+
+  for (let i = 0; i < squares.length; i += 1) {
+    const square = squares[i];
+    if (square.opacity <= 0) continue;
+    const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI;
+    const mag = randomMag(intensity, scale);
+    square.vx += Math.cos(angle) * mag * 0.9;
+    square.vy += Math.sin(angle) * mag * 0.4 - lift;
+    square.vr += (Math.random() - 0.5) * CONFIG.SPIN_MAX * intensity;
+  }
+}
+
 function stepPhysics(squares, dt, width, height, gravityScale = 1) {
+  const scale = worldScale(width, height);
+  const gravity = CONFIG.GRAVITY * scale * gravityScale;
+
   for (let i = 0; i < squares.length; i += 1) {
     const square = squares[i];
     if (square.opacity <= 0) continue;
 
-    square.vy += CONFIG.GRAVITY * gravityScale * dt;
+    square.vy += gravity * dt;
     square.vx *= CONFIG.FRICTION;
     square.vy *= CONFIG.FRICTION;
     square.vr *= CONFIG.ROTATION_DAMP;
@@ -155,7 +190,7 @@ function stepPhysics(squares, dt, width, height, gravityScale = 1) {
     } else if (square.y > height - half) {
       square.y = height - half;
       square.vy = -Math.abs(square.vy) * CONFIG.FLOOR_BOUNCE;
-      square.vx *= 0.9;
+      square.vx *= 0.94;
     }
   }
 }
@@ -168,6 +203,7 @@ function cullLosers(squares, elapsed, dt, width, height, justStarted) {
   );
   const centerX = width * 0.5;
   const centerY = height * 0.5;
+  const scale = worldScale(width, height);
 
   for (let i = 0; i < squares.length; i += 1) {
     const square = squares[i];
@@ -175,14 +211,14 @@ function cullLosers(squares, elapsed, dt, width, height, justStarted) {
 
     if (justStarted) {
       const angle = Math.atan2(square.y - centerY, square.x - centerX);
-      square.vx += Math.cos(angle) * CONFIG.CULL_KICK;
-      square.vy += Math.sin(angle) * CONFIG.CULL_KICK * 0.7 - 180;
+      square.vx += Math.cos(angle) * CONFIG.CULL_KICK * scale;
+      square.vy += Math.sin(angle) * CONFIG.CULL_KICK * scale * 0.7 - 90 * scale;
     }
 
     square.opacity = 1 - progress;
-    square.size *= 0.984;
-    square.vx += (square.x - centerX) * dt * 2.4;
-    square.vy += (square.y - centerY) * dt * 1.6;
+    square.size *= 0.992;
+    square.vx += (square.x - centerX) * dt * 1.4;
+    square.vy += (square.y - centerY) * dt * 0.9;
   }
 }
 
@@ -226,6 +262,7 @@ function boot() {
   function setButton(label, enabled) {
     button.textContent = label;
     button.disabled = !enabled;
+    button.setAttribute('aria-busy', enabled ? 'false' : 'true');
     button.hidden = stage === STAGES.CLAIM;
   }
 
@@ -285,32 +322,48 @@ function boot() {
       survivors[i].color = nextPrizes[i].accent;
     }
 
-    applyImpulse(fromSquares, 1);
+    applyImpulse(fromSquares, 1, bounds.width, bounds.height);
     rumble();
     shake.setArmed(false);
     setButton('Shaking…', false);
 
     let origin = 0;
+    let frames = 0;
     let phase = 'tumble';
     let settleAt = 0;
+    let lastPulse = 0;
     let didCullKick = false;
     squares = fromSquares;
 
     anim = {
       step(ts, dt) {
         if (!origin) origin = ts;
+        frames += 1;
         const elapsed = ts - origin;
 
         if (phase === 'tumble') {
-          const gravityScale = elapsed < 380 ? 0.42 : 1;
+          const gravityScale = elapsed < 720 ? 0.22 : elapsed < 1600 ? 0.55 : 0.85;
           stepPhysics(fromSquares, dt, bounds.width, bounds.height, gravityScale);
+
+          const pulse = Math.floor(elapsed / CONFIG.RETUMBLE_EVERY_MS);
+          if (pulse > lastPulse && elapsed < CONFIG.TUMBLE_MS - 420) {
+            lastPulse = pulse;
+            applyTumblePulse(
+              fromSquares,
+              CONFIG.RETUMBLE_INTENSITY,
+              bounds.width,
+              bounds.height,
+            );
+          }
+
           const shouldKick = !didCullKick && elapsed >= CONFIG.CULL_START_MS;
           cullLosers(fromSquares, elapsed, dt, bounds.width, bounds.height, shouldKick);
           if (shouldKick) didCullKick = true;
           cam = screenOffset(elapsed);
           hintEl.textContent = `${visibleCount(fromSquares)} squares in play`;
 
-          if (elapsed >= CONFIG.TUMBLE_MS) {
+          const tumbleDone = elapsed >= CONFIG.TUMBLE_MS && frames >= CONFIG.MIN_TUMBLE_FRAMES;
+          if (tumbleDone) {
             phase = 'settle';
             settleAt = ts;
             cam = { x: 0, y: 0 };
@@ -338,7 +391,7 @@ function boot() {
           square.rotation = square.startRot * (1 - clamp01(settle));
           square.size = square.startSize + (square.targetSize - square.startSize) * settle;
         }
-        return settle < 1;
+        return settle < 1 || (ts - origin) < CONFIG.ANIMATION_DURATION;
       },
       finish() {
         after(nextPrizes);
@@ -426,9 +479,11 @@ function boot() {
   }
 
   function onShake() {
-    if (anim) return;
+    if (anim || button.disabled) return;
 
     if (stage === STAGES.PILE) {
+      setButton('Shaking…', false);
+      shake.setArmed(false);
       setHud('Shaking', 'Squares are tumbling down to 100.');
       beginReduce(
         squares,
@@ -440,6 +495,8 @@ function boot() {
     }
 
     if (stage === STAGES.SELECT_100 && picked100) {
+      setButton('Shaking…', false);
+      shake.setArmed(false);
       const nextSquares = squaresFromTiles(gridEl, canvas, prizes100);
       hideGrid(gridEl);
       showCanvas(canvas);

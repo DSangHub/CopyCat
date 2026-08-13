@@ -15,7 +15,7 @@ export function createShakeController({
   }
 
   function fire(source) {
-    if (!armed) return;
+    if (!armed || button.disabled) return;
     const now = performance.now();
     if (now - lastShakeAt < cooldownMs) return;
     lastShakeAt = now;
