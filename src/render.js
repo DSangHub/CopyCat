@@ -37,9 +37,9 @@ export function resizeCanvas(canvas) {
 export function createPileSquares(count, width, height, minSize, maxSize) {
   const squares = [];
   const cx = width * 0.5;
-  const cy = height * 0.58;
-  const rx = Math.min(width, height) * 0.44;
-  const ry = Math.min(width, height) * 0.3;
+  const cy = height * 0.56;
+  const rx = width * 0.46;
+  const ry = height * 0.38;
 
   for (let i = 0; i < count; i += 1) {
     const radius = Math.pow(Math.random(), 0.55);

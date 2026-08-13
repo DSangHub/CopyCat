@@ -26,24 +26,25 @@ export const CONFIG = {
   MIN_SQUARE: 8,
   MAX_SQUARE: 18,
 
-  GRAVITY: 2200,
-  FRICTION: 0.986,
-  WALL_BOUNCE: 0.58,
-  FLOOR_BOUNCE: 0.42,
-  ROTATION_DAMP: 0.988,
+  GRAVITY: 1680,
+  FRICTION: 0.988,
+  WALL_BOUNCE: 0.62,
+  FLOOR_BOUNCE: 0.48,
+  ROTATION_DAMP: 0.99,
 
-  IMPULSE_MIN: 420,
-  IMPULSE_MAX: 980,
-  LIFT: 680,
-  SPIN_MAX: 18,
+  IMPULSE_MIN: 520,
+  IMPULSE_MAX: 1180,
+  LIFT: 980,
+  SPIN_MAX: 22,
 
   INTRO_MS: 720,
-  TUMBLE_MS: 1500,
-  CULL_START_MS: 620,
-  SETTLE_MS: 980,
+  TUMBLE_MS: 2100,
+  CULL_START_MS: 780,
+  CULL_KICK: 420,
+  SETTLE_MS: 1100,
 
-  SCREEN_SHAKE_MS: 320,
-  SCREEN_SHAKE_MAG: 14,
+  SCREEN_SHAKE_MS: 420,
+  SCREEN_SHAKE_MAG: 18,
 
   TRY_AGAIN_RATE: 0.38,
   FINAL_PRIZE_WEIGHTS: {
@@ -126,12 +127,12 @@ function applyImpulse(squares, intensity = 1) {
   }
 }
 
-function stepPhysics(squares, dt, width, height) {
+function stepPhysics(squares, dt, width, height, gravityScale = 1) {
   for (let i = 0; i < squares.length; i += 1) {
     const square = squares[i];
     if (square.opacity <= 0) continue;
 
-    square.vy += CONFIG.GRAVITY * dt;
+    square.vy += CONFIG.GRAVITY * gravityScale * dt;
     square.vx *= CONFIG.FRICTION;
     square.vy *= CONFIG.FRICTION;
     square.vr *= CONFIG.ROTATION_DAMP;
@@ -159,7 +160,7 @@ function stepPhysics(squares, dt, width, height) {
   }
 }
 
-function cullLosers(squares, elapsed, dt, width, height) {
+function cullLosers(squares, elapsed, dt, width, height, justStarted) {
   if (elapsed < CONFIG.CULL_START_MS) return;
 
   const progress = easeOutCubic(
@@ -171,10 +172,17 @@ function cullLosers(squares, elapsed, dt, width, height) {
   for (let i = 0; i < squares.length; i += 1) {
     const square = squares[i];
     if (square.survivor) continue;
+
+    if (justStarted) {
+      const angle = Math.atan2(square.y - centerY, square.x - centerX);
+      square.vx += Math.cos(angle) * CONFIG.CULL_KICK;
+      square.vy += Math.sin(angle) * CONFIG.CULL_KICK * 0.7 - 180;
+    }
+
     square.opacity = 1 - progress;
-    square.size *= 0.986;
-    square.vx += (square.x - centerX) * dt * 3.2;
-    square.vy += (square.y - centerY) * dt * 2.1;
+    square.size *= 0.984;
+    square.vx += (square.x - centerX) * dt * 2.4;
+    square.vy += (square.y - centerY) * dt * 1.6;
   }
 }
 
@@ -284,6 +292,7 @@ function boot() {
     const startedAt = performance.now();
     let phase = 'tumble';
     let settleAt = 0;
+    let didCullKick = false;
     squares = fromSquares;
 
     anim = {
@@ -291,8 +300,11 @@ function boot() {
         const elapsed = ts - startedAt;
 
         if (phase === 'tumble') {
-          stepPhysics(fromSquares, dt, bounds.width, bounds.height);
-          cullLosers(fromSquares, elapsed, dt, bounds.width, bounds.height);
+          const gravityScale = elapsed < 380 ? 0.42 : 1;
+          stepPhysics(fromSquares, dt, bounds.width, bounds.height, gravityScale);
+          const shouldKick = !didCullKick && elapsed >= CONFIG.CULL_START_MS;
+          cullLosers(fromSquares, elapsed, dt, bounds.width, bounds.height, shouldKick);
+          if (shouldKick) didCullKick = true;
           cam = screenOffset(elapsed);
           hintEl.textContent = `${visibleCount(fromSquares)} squares in play`;
 
