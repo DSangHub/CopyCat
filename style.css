@@ -259,6 +259,7 @@ body {
 
 #shake-btn:disabled {
   cursor: default;
+  pointer-events: none;
   transform: none;
   filter: grayscale(0.25) brightness(0.85);
   box-shadow: 0 6px 0 #7a4a2a, 0 10px 18px rgba(0, 0, 0, 0.22);
