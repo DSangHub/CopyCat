@@ -23,8 +23,8 @@ export const CONFIG = {
   SHAKE_THRESHOLD: 14,
   SHAKE_COOLDOWN_MS: 900,
 
-  MIN_SQUARE: 8,
-  MAX_SQUARE: 18,
+  MIN_SQUARE: 11,
+  MAX_SQUARE: 24,
 
   GRAVITY: 1680,
   FRICTION: 0.988,
@@ -289,7 +289,7 @@ function boot() {
     shake.setArmed(false);
     setButton('Shaking…', false);
 
-    const startedAt = performance.now();
+    let origin = 0;
     let phase = 'tumble';
     let settleAt = 0;
     let didCullKick = false;
@@ -297,7 +297,8 @@ function boot() {
 
     anim = {
       step(ts, dt) {
-        const elapsed = ts - startedAt;
+        if (!origin) origin = ts;
+        const elapsed = ts - origin;
 
         if (phase === 'tumble') {
           const gravityScale = elapsed < 380 ? 0.42 : 1;
@@ -368,14 +369,7 @@ function boot() {
     shake.setArmed(false);
   }
 
-  function resetGame() {
-    stage = STAGES.PILE;
-    picked100 = null;
-    prizes100 = [];
-    prizes10 = [];
-    hideClaim(claimEl);
-    hideGrid(gridEl);
-    showCanvas(canvas);
+  function buildPile() {
     bounds = resizeCanvas(canvas);
     squares = createPileSquares(
       CONFIG.PILE_COUNT,
@@ -384,6 +378,17 @@ function boot() {
       CONFIG.MIN_SQUARE * bounds.dpr,
       CONFIG.MAX_SQUARE * bounds.dpr,
     );
+  }
+
+  function resetGame() {
+    stage = STAGES.PILE;
+    picked100 = null;
+    prizes100 = [];
+    prizes10 = [];
+    hideClaim(claimEl);
+    hideGrid(gridEl);
+    showCanvas(canvas);
+    buildPile();
     cam = { x: 0, y: 0 };
     setHud('Shake the pile', '1,000 squares. Shake to uncover 100 prizes.');
     setButton('Shake', false);
@@ -399,15 +404,16 @@ function boot() {
       square.vr = (Math.random() - 0.5) * 4;
     }
 
-    const startedAt = performance.now();
+    let origin = 0;
     anim = {
       step(ts, dt) {
+        if (!origin) origin = ts;
         stepPhysics(squares, dt, bounds.width, bounds.height);
         for (let i = 0; i < squares.length; i += 1) {
           squares[i].vx *= 0.96;
           squares[i].vy *= 0.96;
         }
-        return ts - startedAt < CONFIG.INTRO_MS;
+        return ts - origin < CONFIG.INTRO_MS;
       },
       finish() {
         draw();
@@ -482,23 +488,41 @@ function boot() {
 
   playAgain.addEventListener('click', resetGame);
 
-  window.addEventListener('resize', () => {
+  const stageEl = document.querySelector('#stage');
+  let lastLayoutKey = '';
+
+  function onStageResize() {
+    const next = resizeCanvas(canvas);
+    const layoutKey = `${next.width}x${next.height}`;
+    if (layoutKey === lastLayoutKey) return;
+    lastLayoutKey = layoutKey;
+    bounds = next;
+
+    if (stage === STAGES.PILE && !anim) {
+      buildPile();
+      lastLayoutKey = `${bounds.width}x${bounds.height}`;
+      draw();
+    }
+  }
+
+  const observer = new ResizeObserver(onStageResize);
+  observer.observe(stageEl);
+
+  function layoutIsReady(size) {
+    return size.cssWidth >= 160 && size.cssHeight >= 240;
+  }
+
+  function startWhenReady() {
     bounds = resizeCanvas(canvas);
-    if (anim || stage !== STAGES.PILE) {
-      if (stage === STAGES.PILE && !anim) draw();
+    if (!layoutIsReady(bounds)) {
+      requestAnimationFrame(startWhenReady);
       return;
     }
-    squares = createPileSquares(
-      CONFIG.PILE_COUNT,
-      bounds.width,
-      bounds.height,
-      CONFIG.MIN_SQUARE * bounds.dpr,
-      CONFIG.MAX_SQUARE * bounds.dpr,
-    );
-    draw();
-  });
+    lastLayoutKey = `${bounds.width}x${bounds.height}`;
+    resetGame();
+  }
 
-  resetGame();
+  startWhenReady();
 }
 
 if (document.readyState === 'loading') {

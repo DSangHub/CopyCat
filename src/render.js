@@ -15,10 +15,16 @@ function escapeHtml(value) {
 }
 
 export function resizeCanvas(canvas) {
-  const rect = canvas.getBoundingClientRect();
+  const parent = canvas.parentElement;
+  const rect = parent.getBoundingClientRect();
+  const cssWidth = Math.max(1, rect.width);
+  const cssHeight = Math.max(1, rect.height);
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const width = Math.max(1, Math.floor(rect.width * dpr));
-  const height = Math.max(1, Math.floor(rect.height * dpr));
+  const width = Math.max(1, Math.floor(cssWidth * dpr));
+  const height = Math.max(1, Math.floor(cssHeight * dpr));
+
+  canvas.style.width = `${cssWidth}px`;
+  canvas.style.height = `${cssHeight}px`;
 
   if (canvas.width !== width || canvas.height !== height) {
     canvas.width = width;
@@ -29,30 +35,30 @@ export function resizeCanvas(canvas) {
     width,
     height,
     dpr,
-    cssWidth: rect.width,
-    cssHeight: rect.height,
+    cssWidth,
+    cssHeight,
   };
 }
 
 export function createPileSquares(count, width, height, minSize, maxSize) {
   const squares = [];
   const cx = width * 0.5;
-  const cy = height * 0.56;
-  const rx = width * 0.46;
-  const ry = height * 0.38;
+  const floor = height * 0.9;
+  const heapW = width * 0.86;
+  const heapH = height * 0.7;
 
   for (let i = 0; i < count; i += 1) {
-    const radius = Math.pow(Math.random(), 0.55);
-    const angle = Math.random() * Math.PI * 2;
-    const jitterX = (Math.random() - 0.5) * rx * 0.4;
-    const jitterY = (Math.random() - 0.5) * ry * 0.5;
+    const layer = Math.pow(Math.random(), 0.42);
+    const halfWidth = (0.22 + 0.78 * layer) * heapW * 0.5;
+    const x = cx + (Math.random() * 2 - 1) * halfWidth;
+    const y = floor - (1 - layer) * heapH + (Math.random() - 0.5) * (minSize * 1.4);
 
     squares.push({
-      x: cx + Math.cos(angle) * radius * rx + jitterX,
-      y: cy + Math.sin(angle) * radius * ry * 0.85 + jitterY + radius * 18,
+      x,
+      y,
       vx: 0,
       vy: 0,
-      rotation: Math.random() * Math.PI,
+      rotation: (Math.random() - 0.5) * 1.4,
       vr: 0,
       size: minSize + Math.random() * (maxSize - minSize),
       color: PALETTE[(Math.random() * PALETTE.length) | 0],
