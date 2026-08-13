@@ -482,6 +482,8 @@ function boot() {
       markSelected(gridEl, index);
       setGridInteractive(gridEl, false);
       stage = STAGES.CLAIM;
+      hideGrid(gridEl);
+      hideCanvas(canvas);
       setButton('Shake', false);
       showClaim(claimEl, prize, generateClaimCode());
     }

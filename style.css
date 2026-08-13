@@ -278,7 +278,7 @@ body {
   display: grid;
   place-items: center;
   padding: var(--pad);
-  background: rgba(10, 4, 16, 0.72);
+  background: rgba(10, 4, 16, 0.88);
   backdrop-filter: blur(10px);
 }
 
