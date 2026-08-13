@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#14081d" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>Prize Shake</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎁</text></svg>"
+    />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="hud">
+        <p class="eyebrow">Prize Shake</p>
+        <h1 id="title">Shake the pile</h1>
+        <p id="hint">1,000 squares. Shake to uncover 100 prizes.</p>
+      </header>
+
+      <main id="stage">
+        <canvas id="pile" aria-label="Pile of prize squares"></canvas>
+        <div id="grid" class="grid" hidden></div>
+      </main>
+
+      <footer class="controls">
+        <button id="shake-btn" type="button">Shake</button>
+        <p id="status" class="status"></p>
+      </footer>
+    </div>
+
+    <section id="claim" class="claim" hidden>
+      <div class="claim-card">
+        <p class="claim-kicker">You won</p>
+        <div id="claim-mark" class="claim-mark" aria-hidden="true"></div>
+        <h2 id="claim-title"></h2>
+        <p id="claim-store"></p>
+        <p id="claim-blurb"></p>
+        <div class="claim-code-wrap">
+          <span>Demo claim code</span>
+          <strong id="claim-code"></strong>
+        </div>
+        <button id="play-again" type="button">Play again</button>
+      </div>
+    </section>
+
+    <script type="module" src="/src/game.js"></script>
+  </body>
+</html>
