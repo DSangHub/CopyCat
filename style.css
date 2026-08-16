@@ -106,6 +106,24 @@ body {
   pointer-events: none;
 }
 
+.lucky-grid {
+  position: absolute;
+  inset: 8px;
+  display: block;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.lucky-grid[hidden] {
+  display: none;
+}
+
+.lucky-grid canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+}
+
 .grid {
   position: absolute;
   inset: 10px;
@@ -234,7 +252,8 @@ body {
 }
 
 #shake-btn,
-#play-again {
+#play-again,
+#copy-code {
   appearance: none;
   width: min(100%, 420px);
   height: 64px;
@@ -251,8 +270,13 @@ body {
   cursor: pointer;
 }
 
+#copy-code {
+  margin-bottom: 12px;
+}
+
 #shake-btn:active,
-#play-again:active {
+#play-again:active,
+#copy-code:active {
   transform: translateY(6px);
   box-shadow: 0 2px 0 #b85a1a, 0 8px 16px rgba(0, 0, 0, 0.28);
 }
@@ -371,7 +395,8 @@ body {
   }
 
   #shake-btn,
-  #play-again {
+  #play-again,
+  #copy-code {
     height: 56px;
   }
 }

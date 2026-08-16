@@ -14,7 +14,8 @@ const STAGE_10_PRIZES = {
     { kind: 'coupon', label: '35% Off', store: 'Market C', mark: 'C', accent: '#ffd166', blurb: 'A limited digital coupon placeholder.' },
   ],
   gift: [
-    { kind: 'gift', label: 'Mystery Gift', store: 'Retailer B', mark: 'B', accent: '#06d6a0', blurb: 'A placeholder gift prize.' },
+    { kind: 'gift', label: 'Gift Card', store: 'Store A', mark: 'G', accent: '#06d6a0', blurb: 'A placeholder gift card.' },
+    { kind: 'gift', label: 'Mystery Gift', store: 'Retailer B', mark: 'B', accent: '#90be6d', blurb: 'A placeholder gift prize.' },
     { kind: 'gift', label: 'Bonus Bundle', store: 'Shop D', mark: 'D', accent: '#7b61ff', blurb: 'A placeholder gift bundle.' },
   ],
   cash: [

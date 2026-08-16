@@ -2,18 +2,17 @@ import { createShakeController } from './shake.js';
 import {
   resizeCanvas,
   createPileSquares,
-  squaresFromTiles,
+  squaresFromPrizes,
   drawSquares,
   gridTargets,
   showCanvas,
   hideCanvas,
-  renderGrid,
   hideGrid,
   showClaim,
   hideClaim,
 } from './render.js';
 import { assignStage100, assignStage10, generateClaimCode } from './prizes.js';
-import { bindGrid, setGridInteractive, markSelected } from './input.js';
+import { createPrizeGrid, destroyPrizeGrid } from './grids.js';
 
 export const CONFIG = {
   PILE_COUNT: 1000,
@@ -62,6 +61,19 @@ export const CONFIG = {
   },
 
   GRID_PADDING: 28,
+  GRID_100_COLS: 10,
+  GRID_100_ROWS: 10,
+  GRID_10_COLS: 5,
+  GRID_10_ROWS: 2,
+  GRID_100_GUTTER: 4,
+  GRID_10_GUTTER: 10,
+  GRID_PAD: 4,
+  GRID_SELECT_DELAY_MS: 320,
+
+  SECOND_TUMBLE_MS: 1600,
+  SECOND_CULL_START_MS: 720,
+  SECOND_SETTLE_MS: 480,
+  SECOND_ANIMATION_MS: 2080,
 };
 
 const STAGES = {
@@ -195,11 +207,11 @@ function stepPhysics(squares, dt, width, height, gravityScale = 1) {
   }
 }
 
-function cullLosers(squares, elapsed, dt, width, height, justStarted) {
-  if (elapsed < CONFIG.CULL_START_MS) return;
+function cullLosers(squares, elapsed, dt, width, height, justStarted, tumbleMs, cullStartMs) {
+  if (elapsed < cullStartMs) return;
 
   const progress = easeOutCubic(
-    (elapsed - CONFIG.CULL_START_MS) / (CONFIG.TUMBLE_MS - CONFIG.CULL_START_MS),
+    (elapsed - cullStartMs) / Math.max(1, tumbleMs - cullStartMs),
   );
   const centerX = width * 0.5;
   const centerY = height * 0.5;
@@ -253,6 +265,8 @@ function boot() {
   let rafId = 0;
   let lastTs = 0;
   let cam = { x: 0, y: 0 };
+  let lucky = null;
+  let claimCode = '';
 
   function setHud(title, hint) {
     titleEl.textContent = title;
@@ -306,7 +320,13 @@ function boot() {
     return count;
   }
 
-  function beginReduce(fromSquares, nextCount, nextPrizes, after) {
+  function beginReduce(fromSquares, nextCount, nextPrizes, after, simple = false) {
+    const tumbleMs = simple ? CONFIG.SECOND_TUMBLE_MS : CONFIG.TUMBLE_MS;
+    const settleMs = simple ? CONFIG.SECOND_SETTLE_MS : CONFIG.SETTLE_MS;
+    const cullStartMs = simple ? CONFIG.SECOND_CULL_START_MS : CONFIG.CULL_START_MS;
+    const durationMs = simple ? CONFIG.SECOND_ANIMATION_MS : CONFIG.ANIMATION_DURATION;
+    const minFrames = simple ? 48 : CONFIG.MIN_TUMBLE_FRAMES;
+
     const survivors = pickSurvivors(fromSquares, nextCount);
     const { targets } = gridTargets(
       nextCount,
@@ -346,7 +366,7 @@ function boot() {
           stepPhysics(fromSquares, dt, bounds.width, bounds.height, gravityScale);
 
           const pulse = Math.floor(elapsed / CONFIG.RETUMBLE_EVERY_MS);
-          if (pulse > lastPulse && elapsed < CONFIG.TUMBLE_MS - 420) {
+          if (pulse > lastPulse && elapsed < tumbleMs - 420) {
             lastPulse = pulse;
             applyTumblePulse(
               fromSquares,
@@ -356,13 +376,22 @@ function boot() {
             );
           }
 
-          const shouldKick = !didCullKick && elapsed >= CONFIG.CULL_START_MS;
-          cullLosers(fromSquares, elapsed, dt, bounds.width, bounds.height, shouldKick);
+          const shouldKick = !didCullKick && elapsed >= cullStartMs;
+          cullLosers(
+            fromSquares,
+            elapsed,
+            dt,
+            bounds.width,
+            bounds.height,
+            shouldKick,
+            tumbleMs,
+            cullStartMs,
+          );
           if (shouldKick) didCullKick = true;
           cam = screenOffset(elapsed);
           hintEl.textContent = `${visibleCount(fromSquares)} squares in play`;
 
-          const tumbleDone = elapsed >= CONFIG.TUMBLE_MS && frames >= CONFIG.MIN_TUMBLE_FRAMES;
+          const tumbleDone = elapsed >= tumbleMs && frames >= minFrames;
           if (tumbleDone) {
             phase = 'settle';
             settleAt = ts;
@@ -383,7 +412,7 @@ function boot() {
           return true;
         }
 
-        const settle = easeOutBack((ts - settleAt) / CONFIG.SETTLE_MS);
+        const settle = easeOutBack((ts - settleAt) / settleMs);
         for (let i = 0; i < survivors.length; i += 1) {
           const square = survivors[i];
           square.x = square.startX + (square.targetX - square.startX) * settle;
@@ -391,7 +420,7 @@ function boot() {
           square.rotation = square.startRot * (1 - clamp01(settle));
           square.size = square.startSize + (square.targetSize - square.startSize) * settle;
         }
-        return settle < 1 || (ts - origin) < CONFIG.ANIMATION_DURATION;
+        return settle < 1 || (ts - origin) < durationMs;
       },
       finish() {
         after(nextPrizes);
@@ -401,14 +430,27 @@ function boot() {
     startLoop();
   }
 
+  function mountLuckyGrid(nextPrizes, size, onSelect) {
+    destroyPrizeGrid(gridEl);
+    lucky = createPrizeGrid({
+      host: gridEl,
+      prizes: nextPrizes,
+      cols: size === 100 ? CONFIG.GRID_100_COLS : CONFIG.GRID_10_COLS,
+      rows: size === 100 ? CONFIG.GRID_100_ROWS : CONFIG.GRID_10_ROWS,
+      gutter: size === 100 ? CONFIG.GRID_100_GUTTER : CONFIG.GRID_10_GUTTER,
+      pad: CONFIG.GRID_PAD,
+      selectDelayMs: CONFIG.GRID_SELECT_DELAY_MS,
+      onSelect,
+    });
+  }
+
   function showSelect100(nextPrizes) {
     prizes100 = nextPrizes;
     stage = STAGES.SELECT_100;
     hideCanvas(canvas);
-    renderGrid(gridEl, prizes100, '100');
-    setGridInteractive(gridEl, true);
+    mountLuckyGrid(prizes100, 100, onPick100);
     setHud('Pick a square', 'Tap one of the 100 to lock it in.');
-    setButton('Pick a square first', false);
+    setButton('Pick a square', false);
     shake.setArmed(false);
   }
 
@@ -416,11 +458,44 @@ function boot() {
     prizes10 = nextPrizes;
     stage = STAGES.SELECT_10;
     hideCanvas(canvas);
-    renderGrid(gridEl, prizes10, '10');
-    setGridInteractive(gridEl, true);
+    mountLuckyGrid(prizes10, 10, onPick10);
     setHud('Final 10', 'Every square here has real placeholder value.');
     setButton('Pick your prize', false);
     shake.setArmed(false);
+  }
+
+  function onPick100(index) {
+    if (stage !== STAGES.SELECT_100 || anim) return;
+    picked100 = prizes100[index];
+    const followUp = picked100.kind === 'try'
+      ? 'Not this one — tumbling down to the final 10.'
+      : `${picked100.label} locked. Tumbling down to the final 10.`;
+    setHud('Square locked', followUp);
+    setButton('Shaking…', false);
+    shake.setArmed(false);
+    destroyPrizeGrid(gridEl);
+    lucky = null;
+    const nextSquares = squaresFromPrizes(prizes100, canvas, CONFIG.GRID_100_COLS);
+    showCanvas(canvas);
+    beginReduce(
+      nextSquares,
+      CONFIG.STAGE_10_COUNT,
+      assignStage10(CONFIG.STAGE_10_COUNT, CONFIG.FINAL_PRIZE_WEIGHTS),
+      showSelect10,
+      true,
+    );
+  }
+
+  function onPick10(index) {
+    if (stage !== STAGES.SELECT_10 || anim) return;
+    const prize = prizes10[index];
+    stage = STAGES.CLAIM;
+    destroyPrizeGrid(gridEl);
+    lucky = null;
+    hideCanvas(canvas);
+    setButton('Shake', false);
+    claimCode = generateClaimCode();
+    showClaim(claimEl, prize, claimCode);
   }
 
   function buildPile() {
@@ -439,6 +514,9 @@ function boot() {
     picked100 = null;
     prizes100 = [];
     prizes10 = [];
+    claimCode = '';
+    lucky = null;
+    destroyPrizeGrid(gridEl);
     hideClaim(claimEl);
     hideGrid(gridEl);
     showCanvas(canvas);
@@ -491,22 +569,6 @@ function boot() {
         assignStage100(CONFIG.STAGE_100_COUNT, CONFIG.TRY_AGAIN_RATE),
         showSelect100,
       );
-      return;
-    }
-
-    if (stage === STAGES.SELECT_100 && picked100) {
-      setButton('Shaking…', false);
-      shake.setArmed(false);
-      const nextSquares = squaresFromTiles(gridEl, canvas, prizes100);
-      hideGrid(gridEl);
-      showCanvas(canvas);
-      setHud('Shaking', 'The rest tumble down to 10 final prizes.');
-      beginReduce(
-        nextSquares,
-        CONFIG.STAGE_10_COUNT,
-        assignStage10(CONFIG.STAGE_10_COUNT, CONFIG.FINAL_PRIZE_WEIGHTS),
-        showSelect10,
-      );
     }
   }
 
@@ -518,35 +580,18 @@ function boot() {
     statusEl,
   });
 
-  bindGrid(gridEl, (index) => {
-    if (anim) return;
+  playAgain.addEventListener('click', resetGame);
 
-    if (stage === STAGES.SELECT_100) {
-      picked100 = prizes100[index];
-      markSelected(gridEl, index);
-      setGridInteractive(gridEl, false);
-      const followUp = picked100.kind === 'try'
-        ? 'Not this one — shake again for the final 10.'
-        : `${picked100.label} locked. Shake again for the final 10.`;
-      setHud('Square locked', followUp);
-      setButton('Shake again', true);
-      shake.setArmed(true);
-      return;
-    }
-
-    if (stage === STAGES.SELECT_10) {
-      const prize = prizes10[index];
-      markSelected(gridEl, index);
-      setGridInteractive(gridEl, false);
-      stage = STAGES.CLAIM;
-      hideGrid(gridEl);
-      hideCanvas(canvas);
-      setButton('Shake', false);
-      showClaim(claimEl, prize, generateClaimCode());
+  const copyBtn = document.querySelector('#copy-code');
+  copyBtn?.addEventListener('click', async () => {
+    if (!claimCode) return;
+    try {
+      await navigator.clipboard.writeText(claimCode);
+      copyBtn.textContent = 'Copied';
+    } catch {
+      copyBtn.textContent = 'Copy failed';
     }
   });
-
-  playAgain.addEventListener('click', resetGame);
 
   const stageEl = document.querySelector('#stage');
   let lastLayoutKey = '';
@@ -562,6 +607,12 @@ function boot() {
       buildPile();
       lastLayoutKey = `${bounds.width}x${bounds.height}`;
       draw();
+    }
+
+    if (stage === STAGES.SELECT_100 && prizes100.length) {
+      mountLuckyGrid(prizes100, 100, onPick100);
+    } else if (stage === STAGES.SELECT_10 && prizes10.length) {
+      mountLuckyGrid(prizes10, 10, onPick10);
     }
   }
 

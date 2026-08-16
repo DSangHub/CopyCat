@@ -106,6 +106,42 @@ export function squaresFromTiles(gridEl, canvas, prizes) {
   });
 }
 
+export function squaresFromPrizes(prizes, canvas, cols) {
+  const dpr = canvas.width / Math.max(canvas.getBoundingClientRect().width, 1);
+  const rows = Math.ceil(prizes.length / cols);
+  const pad = 12 * dpr;
+  const gap = (cols >= 10 ? 5 : 10) * dpr;
+  const innerW = canvas.width - pad * 2;
+  const innerH = canvas.height - pad * 2;
+  const cellW = (innerW - gap * (cols - 1)) / cols;
+  const cellH = (innerH - gap * (rows - 1)) / rows;
+  const size = Math.max(8, Math.min(cellW, cellH) * 0.86);
+
+  return prizes.map((prize, index) => {
+    const col = index % cols;
+    const row = (index / cols) | 0;
+    return {
+      x: pad + col * (cellW + gap) + cellW / 2,
+      y: pad + row * (cellH + gap) + cellH / 2,
+      vx: 0,
+      vy: 0,
+      rotation: 0,
+      vr: 0,
+      size,
+      color: prize.kind === 'try' ? '#6b7280' : prize.accent,
+      opacity: 1,
+      survivor: false,
+      targetX: 0,
+      targetY: 0,
+      targetSize: 0,
+      startX: 0,
+      startY: 0,
+      startRot: 0,
+      startSize: 0,
+    };
+  });
+}
+
 export function drawSquares(ctx, squares, shakeX, shakeY) {
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.save();
@@ -190,10 +226,17 @@ export function showClaim(claimEl, prize, code) {
   claimEl.hidden = false;
   claimEl.querySelector('#claim-mark').textContent = prize.mark;
   claimEl.querySelector('#claim-mark').style.setProperty('--accent', prize.accent);
-  claimEl.querySelector('#claim-title').textContent = prize.label;
-  claimEl.querySelector('#claim-store').textContent = prize.store;
+  const title = prize.store ? `${prize.label} – ${prize.store}` : prize.label;
+  claimEl.querySelector('#claim-title').textContent = title;
+  claimEl.querySelector('#claim-store').textContent = prize.kind === 'try' ? '' : 'Placeholder prize';
   claimEl.querySelector('#claim-blurb').textContent = prize.blurb || 'Placeholder prize — not a real offer.';
   claimEl.querySelector('#claim-code').textContent = code;
+  const copyBtn = claimEl.querySelector('#copy-code');
+  if (copyBtn) {
+    copyBtn.hidden = false;
+    copyBtn.textContent = 'Copy Code';
+    copyBtn.disabled = false;
+  }
 }
 
 export function hideClaim(claimEl) {
