@@ -100,7 +100,7 @@ export function createPrizeGrid({
   const buttons = prizes.map((prize, index) => ({
     x: index % cols,
     y: (index / cols) | 0,
-    background: prize.kind === 'try' ? '#3c3642' : prize.accent,
+    background: prize.kind === 'try' ? '#6d6574' : prize.accent,
     borderRadius: compact ? 6 : 14,
     fonts: cellFonts(prize, compact),
     prizeIndex: index,
@@ -145,7 +145,7 @@ export function createPrizeGrid({
       ...button,
       background: i === index
         ? '#ffc857'
-        : (prizes[i].kind === 'try' ? '#2a262e' : prizes[i].accent),
+        : (prizes[i].kind === 'try' ? '#4a4450' : prizes[i].accent),
       shadow: i === index ? '0 0 10px #ffc857' : '',
     }));
 
