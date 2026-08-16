@@ -8,16 +8,17 @@ alwaysApply: true
 ## Stack
 - Vite + vanilla JavaScript (ES modules). No React, no frameworks unless I explicitly ask.
 - HTML5 Canvas for the big tumbling pile (1000 squares).
-- Switch to DOM grid once down to 100 and then 10 squares (easier selection + logos).
+- lucky-canvas LuckyGrid for the selectable 100 and 10 prize squares.
 - No backend in the first version. All prizes are placeholders.
 
 ## Architecture
 - One responsibility per file:
   - `game.js`     → main loop, state machine, constants
   - `shake.js`    → DeviceMotion + button fallback
-  - `render.js`   → Canvas pile + DOM grids
+  - `render.js`   → Canvas pile
+  - `grids.js`    → lucky-canvas LuckyGrid for 100 and 10
   - `prizes.js`   → prize assignment logic
-  - `input.js`    → click/tap selection
+  - `input.js`    → click/tap helpers
 - Single `requestAnimationFrame` loop only while animating/shaking. Stop it when idle.
 - All tunable constants at the very top of `game.js` (SQUARE_COUNT, SHAKE_THRESHOLD, ANIMATION_DURATION, etc.).
 
